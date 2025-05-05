@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         AnimDepScripts
+// @name         Animate Control Panel Collapsible
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  Коллапсируемая панель с иконками управления framerate и паузой на Animate-страницах; отображение текущего framerate внутри контейнера кнопок
+// @version      1.10
+// @description  Коллапсируемая панель с иконками управления framerate и паузой на Animate-страницах; отображение текущего framerate внутри контейнера кнопок с эффектом hover и появлением фона в hover-зоне
 // @match        *://*/*
 // @include      file:///*
 // @grant        none
@@ -75,7 +75,7 @@
         updateFrDisplay();
         btnContainer.appendChild(frDisplay);
 
-        // Функция создания кнопки с иконкой
+        // Функция создания кнопки с иконкой и hover-эффектом
         function addIconButton(iconName, title, onClick) {
             const btn = document.createElement('button');
             const icon = document.createElement('span');
@@ -95,8 +95,12 @@
                 border: 'none',
                 borderRadius: '4px',
                 color: '#fff',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                transition: 'background 0.2s'
             });
+            // hover
+            btn.addEventListener('mouseenter', () => { btn.style.background = 'rgba(255,255,255,0.2)'; });
+            btn.addEventListener('mouseleave', () => { btn.style.background = 'rgba(0,0,0,0.5)'; });
             btn.addEventListener('click', () => { onClick(); updateFrDisplay(); });
             btnContainer.appendChild(btn);
         }
@@ -142,13 +146,15 @@
             color: '#fff'
         });
 
-        // Обработчик hover в левом верхнем уголке
+        // hover зона: показываем иконку и фон панели
         document.addEventListener('mousemove', (e) => {
             const threshold = 50;
             if (e.clientX <= threshold && e.clientY <= threshold && panel.classList.contains('collapsed')) {
                 toggle.style.opacity = '1';
+                panel.style.background = bgExpanded;
             } else if (panel.classList.contains('collapsed')) {
                 toggle.style.opacity = '0';
+                panel.style.background = bgCollapsed;
             }
         });
 
