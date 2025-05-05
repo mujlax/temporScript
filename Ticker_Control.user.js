@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ticker Control
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.4
 // @description  Меняй framerate по хоткею
 // @match        *://*/*
 // @grant        none
