@@ -11,7 +11,7 @@
     'use strict';
 
      window.addEventListener('load', () => {
-        console.log('[Tampermonkey] Скрипт активен');
+        console.log('[Tampermonkey] Скрипт активен Новая версия');
 
         document.addEventListener('keydown', function (e) {
             if (!e.shiftKey) return;
