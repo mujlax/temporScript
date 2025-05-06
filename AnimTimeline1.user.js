@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         AnimDepartWithTimelime
+// @name         Animate Control Panel Collapsible
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      1.10
 // @description  Коллапсируемая панель с иконками управления framerate и паузой на Animate-страницах; отображение текущего framerate внутри контейнера кнопок с эффектом hover и появлением фона в hover-зоне
 // @match        *://*/*
 // @include      file:///*
@@ -13,7 +13,7 @@
 
     window.addEventListener('load', () => {
         // Проверка Animate-страницы
-        const isAnimateCC = !!document.querySelector('meta[name="authoring-tool"][content*="Adobe_Animate_CC"]');
+        const isAnimateCC = !!document.querySelector('div#animation_container');
         if (!isAnimateCC) return;
         console.log('[Animate Panel] Adobe Animate страница обнаружена');
 
