@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Anim Depart Panels
+// @name         Animate Control Panel Collapsible
 // @namespace    http://tampermonkey.net/
-// @version      1.5
-// @description  Zaebisya
+// @version      1.13
+// @description  Коллапсируемая панель с иконками управления framerate и паузой на Animate-страницах; отображение текущего framerate внутри контейнера кнопок с эффектом hover и появлением фона в hover-зоне
 // @match        *://*/*
 // @include      file:///*
 // @grant        none
@@ -343,6 +343,61 @@
         let rulersActive = false;
         let horizontalRuler = null;
         let verticalRuler = null;
+        let rectangles = [];
+        let selectedColor = 'rgba(255, 0, 0, 0.3)';
+        let colorPalette = null;
+
+        function createColorPalette() {
+            const palette = document.createElement('div');
+            Object.assign(palette.style, {
+                position: 'fixed',
+                bottom: '10px',
+                right: '10px',
+                background: 'rgba(0, 0, 0, 0.7)',
+                padding: '5px',
+                borderRadius: '5px',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '5px',
+                zIndex: '9999',
+                maxWidth: '150px'
+            });
+
+            const colors = [
+                'rgba(255, 0, 0, 0.3)',    // Красный
+                'rgba(255, 165, 0, 0.3)',  // Оранжевый
+                'rgba(255, 255, 0, 0.3)',  // Жёлтый
+                'rgba(0, 128, 0, 0.3)',    // Зелёный
+                'rgba(0, 0, 255, 0.3)',    // Синий
+                'rgba(128, 0, 128, 0.3)',  // Фиолетовый
+                'rgba(0, 0, 0, 0.3)',      // Чёрный
+                'rgba(255, 255, 255, 0.3)' // Белый
+            ];
+
+            colors.forEach(color => {
+                const colorBtn = document.createElement('div');
+                Object.assign(colorBtn.style, {
+                    width: '25px',
+                    height: '25px',
+                    background: color,
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    border: color === selectedColor ? '2px solid white' : '1px solid #ccc'
+                });
+
+                colorBtn.addEventListener('click', () => {
+                    selectedColor = color;
+                    // Обновляем выделение выбранного цвета
+                    palette.querySelectorAll('div').forEach(btn => {
+                        btn.style.border = btn === colorBtn ? '2px solid white' : '1px solid #ccc';
+                    });
+                });
+
+                palette.appendChild(colorBtn);
+            });
+
+            return palette;
+        }
 
         function createRulers() {
             // Создаем горизонтальную линейку
@@ -455,6 +510,420 @@
                 }
 
                 verticalRuler.appendChild(tick);
+            }
+
+            // Создаем цветовую палитру
+            colorPalette = createColorPalette();
+            document.body.appendChild(colorPalette);
+            colorPalette.style.display = 'none';
+
+            // Добавляем функционал рисования прямоугольников
+            let isDrawingRect = false;
+            let startX, startY;
+            let currentRect = null;
+            let isResizing = false;
+            let resizeDirection = '';
+            let currentResizeRect = null;
+
+            // Функция для добавления маркеров изменения размера к прямоугольнику
+            function addResizeHandles(rect) {
+                const handles = {
+                    n: document.createElement('div'),  // верх
+                    e: document.createElement('div'),  // право
+                    s: document.createElement('div'),  // низ
+                    w: document.createElement('div'),  // лево
+                    ne: document.createElement('div'), // верх-право
+                    se: document.createElement('div'), // низ-право
+                    sw: document.createElement('div'), // низ-лево
+                    nw: document.createElement('div')  // верх-лево
+                };
+
+                // Общие стили для всех маркеров
+                const handleStyle = {
+                    position: 'absolute',
+                    width: '8px',
+                    height: '8px',
+                    background: 'white',
+                    border: '1px solid #666',
+                    zIndex: '9999',
+                    display: 'none'
+                };
+
+                // Позиционирование маркеров
+                Object.assign(handles.n.style, handleStyle, {
+                    top: '-4px',
+                    left: 'calc(50% - 4px)',
+                    cursor: 'n-resize'
+                });
+
+                Object.assign(handles.e.style, handleStyle, {
+                    top: 'calc(50% - 4px)',
+                    right: '-4px',
+                    cursor: 'e-resize'
+                });
+
+                Object.assign(handles.s.style, handleStyle, {
+                    bottom: '-4px',
+                    left: 'calc(50% - 4px)',
+                    cursor: 's-resize'
+                });
+
+                Object.assign(handles.w.style, handleStyle, {
+                    top: 'calc(50% - 4px)',
+                    left: '-4px',
+                    cursor: 'w-resize'
+                });
+
+                Object.assign(handles.ne.style, handleStyle, {
+                    top: '-4px',
+                    right: '-4px',
+                    cursor: 'ne-resize'
+                });
+
+                Object.assign(handles.se.style, handleStyle, {
+                    bottom: '-4px',
+                    right: '-4px',
+                    cursor: 'se-resize'
+                });
+
+                Object.assign(handles.sw.style, handleStyle, {
+                    bottom: '-4px',
+                    left: '-4px',
+                    cursor: 'sw-resize'
+                });
+
+                Object.assign(handles.nw.style, handleStyle, {
+                    top: '-4px',
+                    left: '-4px',
+                    cursor: 'nw-resize'
+                });
+
+                // Добавляем обработчики событий для всех маркеров
+                for (const [direction, handle] of Object.entries(handles)) {
+                    handle.className = 'resize-handle';
+                    handle.dataset.direction = direction;
+
+                    handle.addEventListener('mousedown', (e) => {
+                        e.stopPropagation();
+                        isResizing = true;
+                        resizeDirection = direction;
+                        currentResizeRect = rect;
+
+                        const offsetX = e.clientX;
+                        const offsetY = e.clientY;
+                        const rectLeft = parseInt(rect.style.left);
+                        const rectTop = parseInt(rect.style.top);
+                        const rectWidth = parseInt(rect.style.width);
+                        const rectHeight = parseInt(rect.style.height);
+
+                        const moveHandler = (moveEvent) => {
+                            if (!isResizing) return;
+
+                            moveEvent.preventDefault();
+
+                            const dx = moveEvent.clientX - offsetX;
+                            const dy = moveEvent.clientY - offsetY;
+
+                            switch (direction) {
+                                case 'n':
+                                    const newTopN = rectTop + dy;
+                                    const newHeightN = rectHeight - dy;
+                                    if (newHeightN > 10) {
+                                        rect.style.top = `${newTopN}px`;
+                                        rect.style.height = `${newHeightN}px`;
+                                    }
+                                    break;
+                                case 'e':
+                                    const newWidthE = rectWidth + dx;
+                                    if (newWidthE > 10) {
+                                        rect.style.width = `${newWidthE}px`;
+                                    }
+                                    break;
+                                case 's':
+                                    const newHeightS = rectHeight + dy;
+                                    if (newHeightS > 10) {
+                                        rect.style.height = `${newHeightS}px`;
+                                    }
+                                    break;
+                                case 'w':
+                                    const newLeftW = rectLeft + dx;
+                                    const newWidthW = rectWidth - dx;
+                                    if (newWidthW > 10) {
+                                        rect.style.left = `${newLeftW}px`;
+                                        rect.style.width = `${newWidthW}px`;
+                                    }
+                                    break;
+                                case 'ne':
+                                    const newTopNE = rectTop + dy;
+                                    const newHeightNE = rectHeight - dy;
+                                    const newWidthNE = rectWidth + dx;
+                                    if (newHeightNE > 10) {
+                                        rect.style.top = `${newTopNE}px`;
+                                        rect.style.height = `${newHeightNE}px`;
+                                    }
+                                    if (newWidthNE > 10) {
+                                        rect.style.width = `${newWidthNE}px`;
+                                    }
+                                    break;
+                                case 'se':
+                                    const newHeightSE = rectHeight + dy;
+                                    const newWidthSE = rectWidth + dx;
+                                    if (newHeightSE > 10) {
+                                        rect.style.height = `${newHeightSE}px`;
+                                    }
+                                    if (newWidthSE > 10) {
+                                        rect.style.width = `${newWidthSE}px`;
+                                    }
+                                    break;
+                                case 'sw':
+                                    const newLeftSW = rectLeft + dx;
+                                    const newWidthSW = rectWidth - dx;
+                                    const newHeightSW = rectHeight + dy;
+                                    if (newWidthSW > 10) {
+                                        rect.style.left = `${newLeftSW}px`;
+                                        rect.style.width = `${newWidthSW}px`;
+                                    }
+                                    if (newHeightSW > 10) {
+                                        rect.style.height = `${newHeightSW}px`;
+                                    }
+                                    break;
+                                case 'nw':
+                                    const newTopNW = rectTop + dy;
+                                    const newHeightNW = rectHeight - dy;
+                                    const newLeftNW = rectLeft + dx;
+                                    const newWidthNW = rectWidth - dx;
+                                    if (newHeightNW > 10) {
+                                        rect.style.top = `${newTopNW}px`;
+                                        rect.style.height = `${newHeightNW}px`;
+                                    }
+                                    if (newWidthNW > 10) {
+                                        rect.style.left = `${newLeftNW}px`;
+                                        rect.style.width = `${newWidthNW}px`;
+                                    }
+                                    break;
+                            }
+                        };
+
+                        const upHandler = () => {
+                            isResizing = false;
+                            resizeDirection = '';
+                            currentResizeRect = null;
+                            document.removeEventListener('mousemove', moveHandler);
+                            document.removeEventListener('mouseup', upHandler);
+                        };
+
+                        document.addEventListener('mousemove', moveHandler);
+                        document.addEventListener('mouseup', upHandler);
+                    });
+
+                    rect.appendChild(handle);
+                }
+
+                // Показываем и скрываем маркеры при наведении
+                rect.addEventListener('mouseenter', () => {
+                    for (const handle of Object.values(handles)) {
+                        handle.style.display = 'block';
+                    }
+                });
+
+                rect.addEventListener('mouseleave', () => {
+                    // Скрываем маркеры только если не происходит изменение размера
+                    if (!isResizing || currentResizeRect !== rect) {
+                        for (const handle of Object.values(handles)) {
+                            handle.style.display = 'none';
+                        }
+                    }
+                });
+
+                return handles;
+            }
+
+            document.addEventListener('mousedown', (e) => {
+                // Если линейки активны и не находимся на линейках или направляющих
+                if (rulersActive &&
+                    e.target !== horizontalRuler &&
+                    e.target !== verticalRuler) {
+
+                    // Проверяем, кликнули ли мы по прямоугольнику
+                    let clickedRect = null;
+                    let clickedOnRect = false;
+
+                    // Сначала проверяем, кликнули ли мы по существующему прямоугольнику
+                    for (let rect of rectangles) {
+                        const rectEl = rect.element;
+                        const rectRect = rectEl.getBoundingClientRect();
+
+                        if (e.clientX >= rectRect.left && e.clientX <= rectRect.right &&
+                            e.clientY >= rectRect.top && e.clientY <= rectRect.bottom) {
+
+                            clickedRect = rect;
+                            clickedOnRect = true;
+                            break;
+                        }
+                    }
+
+                    // Если кликнули по прямоугольнику и зажат Shift - копируем его
+                    if (clickedOnRect && e.shiftKey) {
+                        const rectEl = clickedRect.element;
+
+                        // Копируем прямоугольник
+                        const copyRect = document.createElement('div');
+                        copyRect.className = 'rectangle';
+                        Object.assign(copyRect.style, {
+                            position: 'absolute',
+                            left: `${parseInt(rectEl.style.left) + 10}px`,
+                            top: `${parseInt(rectEl.style.top) + 10}px`,
+                            width: rectEl.style.width,
+                            height: rectEl.style.height,
+                            background: rectEl.style.background,
+                            border: '1px solid #666',
+                            zIndex: '9995',
+                            cursor: 'move'
+                        });
+
+                        document.body.appendChild(copyRect);
+
+                        // Добавляем в массив прямоугольников
+                        rectangles.push({
+                            element: copyRect,
+                            color: rectEl.style.background
+                        });
+
+                        // Добавляем функционал перетаскивания
+                        makeRectDraggable(copyRect);
+
+                        // Добавляем маркеры изменения размера
+                        addResizeHandles(copyRect);
+
+                        // Добавляем удаление по двойному клику
+                        copyRect.addEventListener('dblclick', function() {
+                            const rect = this;
+                            if (rect) {
+                                rect.remove();
+                                rectangles = rectangles.filter(r => r.element !== rect);
+                            }
+                        });
+
+                        return;
+                    }
+                    // Если кликнули по прямоугольнику без Shift - позволяем перетаскивать его
+                    else if (clickedOnRect) {
+                        return; // Обработка перетаскивания будет в makeRectDraggable
+                    }
+
+                    // Если не кликнули по прямоугольнику и не на направляющих, рисуем новый прямоугольник
+                    if (!clickedOnRect &&
+                        !e.target.closest('.guide')) {
+                        // Начинаем рисовать прямоугольник
+                        isDrawingRect = true;
+                        startX = e.clientX;
+                        startY = e.clientY;
+
+                        currentRect = document.createElement('div');
+                        currentRect.className = 'rectangle';
+                        Object.assign(currentRect.style, {
+                            position: 'absolute',
+                            left: `${startX}px`,
+                            top: `${startY}px`,
+                            width: '0px',
+                            height: '0px',
+                            background: selectedColor,
+                            border: '1px solid #666',
+                            zIndex: '9995',
+                            cursor: 'move'
+                        });
+
+                        document.body.appendChild(currentRect);
+                    }
+                }
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (isDrawingRect && currentRect) {
+                    const width = e.clientX - startX;
+                    const height = e.clientY - startY;
+
+                    // Устанавливаем размеры и позицию в зависимости от направления рисования
+                    if (width < 0) {
+                        currentRect.style.left = `${e.clientX}px`;
+                        currentRect.style.width = `${Math.abs(width)}px`;
+                    } else {
+                        currentRect.style.width = `${width}px`;
+                    }
+
+                    if (height < 0) {
+                        currentRect.style.top = `${e.clientY}px`;
+                        currentRect.style.height = `${Math.abs(height)}px`;
+                    } else {
+                        currentRect.style.height = `${height}px`;
+                    }
+                }
+            });
+
+            document.addEventListener('mouseup', (e) => {
+                if (isDrawingRect && currentRect) {
+                    isDrawingRect = false;
+
+                    // Если прямоугольник слишком маленький, удаляем его
+                    if (parseInt(currentRect.style.width) < 5 || parseInt(currentRect.style.height) < 5) {
+                        currentRect.remove();
+                        currentRect = null;
+                        return;
+                    }
+
+                    // Добавляем в массив прямоугольников
+                    rectangles.push({
+                        element: currentRect,
+                        color: selectedColor
+                    });
+
+                    // Добавляем функционал перетаскивания
+                    makeRectDraggable(currentRect);
+
+                    // Добавляем маркеры изменения размера
+                    addResizeHandles(currentRect);
+
+                    // Добавляем удаление по двойному клику
+                    currentRect.addEventListener('dblclick', function() {
+                        const rect = this;
+                        if (rect) {
+                            rect.remove();
+                            rectangles = rectangles.filter(r => r.element !== rect);
+                        }
+                    });
+
+                    currentRect = null;
+                }
+            });
+
+            // Функция для добавления возможности перетаскивания прямоугольника
+            function makeRectDraggable(element) {
+                let isDragging = false;
+                let offsetX, offsetY;
+
+                element.addEventListener('mousedown', (e) => {
+                    if (!e.shiftKey) { // Только если не зажата клавиша Shift
+                        isDragging = true;
+                        offsetX = e.clientX - parseInt(element.style.left);
+                        offsetY = e.clientY - parseInt(element.style.top);
+                        e.stopPropagation(); // Предотвращаем создание нового прямоугольника
+                    }
+                });
+
+                const moveHandler = (e) => {
+                    if (isDragging) {
+                        element.style.left = `${e.clientX - offsetX}px`;
+                        element.style.top = `${e.clientY - offsetY}px`;
+                        e.preventDefault();
+                    }
+                };
+
+                const upHandler = () => {
+                    isDragging = false;
+                };
+
+                document.addEventListener('mousemove', moveHandler);
+                document.addEventListener('mouseup', upHandler);
             }
 
             // Добавляем функционал создания направляющих
@@ -583,11 +1052,13 @@
                 }
                 horizontalRuler.style.display = 'block';
                 verticalRuler.style.display = 'block';
+                if (colorPalette) colorPalette.style.display = 'flex';
             } else {
                 if (horizontalRuler && verticalRuler) {
                     horizontalRuler.style.display = 'none';
                     verticalRuler.style.display = 'none';
                 }
+                if (colorPalette) colorPalette.style.display = 'none';
             }
         }
 
