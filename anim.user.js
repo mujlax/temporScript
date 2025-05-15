@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Animate Control Panel Collapsible
 // @namespace    http://tampermonkey.net/
-// @version      1.20
+// @version      1.25
 // @description  Коллапсируемая панель с иконками управления framerate и паузой на Animate-страницах; отображение текущего framerate внутри контейнера кнопок с эффектом hover и появлением фона в hover-зоне
 // @match        *://*/*
 // @include      file:///*
@@ -51,6 +51,13 @@
             input[type=number] {
                 -moz-appearance: textfield;
                 appearance: textfield;
+            }
+            /* Предотвращение выделения текста при перетаскивании */
+            .no-select, .no-select * {
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                -ms-user-select: none;
+                user-select: none;
             }
             `;
             document.head.appendChild(style);
@@ -420,6 +427,7 @@
             function createRulers() {
                 // Создаем горизонтальную линейку
                 horizontalRuler = document.createElement('div');
+                horizontalRuler.className = 'no-select';
                 Object.assign(horizontalRuler.style, {
                     position: 'absolute',
                     top: '0',
@@ -434,6 +442,7 @@
 
                 // Создаем вертикальную линейку
                 verticalRuler = document.createElement('div');
+                verticalRuler.className = 'no-select';
                 Object.assign(verticalRuler.style, {
                     position: 'absolute',
                     top: '0',
@@ -862,6 +871,7 @@
 
                 document.addEventListener('mousemove', (e) => {
                     if (isDrawingRect && currentRect) {
+                        e.preventDefault(); // Предотвращаем выделение текста
                         const width = e.clientX - startX;
                         const height = e.clientY - startY;
                         
@@ -956,7 +966,10 @@
                 // Горизонтальные направляющие
                 horizontalRuler.addEventListener('mousedown', (e) => {
                     if (e.button === 0) {
+                        e.preventDefault(); // Предотвращаем выделение текста
+                        
                         const newGuide = document.createElement('div');
+                        newGuide.className = 'guide no-select';
                         Object.assign(newGuide.style, {
                             position: 'absolute',
                             left: '0',
@@ -1004,6 +1017,7 @@
                         // Перетаскивание
                         newGuide.addEventListener('mousedown', (guideEvent) => {
                             guideEvent.stopPropagation();
+                            guideEvent.preventDefault(); // Предотвращаем выделение текста
                             
                             const guideMoveHandler = (moveEvent) => {
                                 newGuide.style.top = `${moveEvent.clientY}px`;
@@ -1023,7 +1037,10 @@
                 // Вертикальные направляющие
                 verticalRuler.addEventListener('mousedown', (e) => {
                     if (e.button === 0) {
+                        e.preventDefault(); // Предотвращаем выделение текста
+                        
                         const newGuide = document.createElement('div');
+                        newGuide.className = 'guide no-select';
                         Object.assign(newGuide.style, {
                             position: 'absolute',
                             left: `${e.clientX}px`,
@@ -1071,6 +1088,7 @@
                         // Перетаскивание
                         newGuide.addEventListener('mousedown', (guideEvent) => {
                             guideEvent.stopPropagation();
+                            guideEvent.preventDefault(); // Предотвращаем выделение текста
                             
                             const guideMoveHandler = (moveEvent) => {
                                 newGuide.style.left = `${moveEvent.clientX}px`;
