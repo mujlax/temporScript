@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Animate Control Panel Collapsible
 // @namespace    http://tampermonkey.net/
-// @version      1.25
+// @version      1.30
 // @description  Коллапсируемая панель с иконками управления framerate и паузой на Animate-страницах; отображение текущего framerate внутри контейнера кнопок с эффектом hover и появлением фона в hover-зоне
 // @match        *://*/*
 // @include      file:///*
